@@ -1,0 +1,449 @@
+﻿<!doctype html>
+<html>
+<head>
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Printer Status Dashboard</title>
+<hta:application
+  id="printerDashboard"
+  applicationname="PrinterDashboard"
+  border="thin"
+  caption="yes"
+  showintaskbar="yes"
+  singleinstance="no"
+  maximizebutton="yes"
+  minimizebutton="yes"
+  scroll="auto"
+  contextmenu="no"
+  innerborder="no"
+  windowstate="normal" />
+
+<style>
+  /* IE/Trident engine: no CSS variables, so colours are written out literally. */
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0b1220;
+    color: #e6edf7;
+    font-family: "Segoe UI", Tahoma, "Leelawadee UI", sans-serif;
+    font-size: 14px;
+    overflow: auto;
+  }
+
+  .wrap { padding: 18px 20px 28px; }
+
+  .head {
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-align: start;
+    align-items: flex-start;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  h1 { font-size: 19px; margin: 0 0 3px; }
+  .subtitle { color: #8fa2c0; font-size: 12px; margin: 0; }
+  .stamp { color: #8fa2c0; font-size: 12px; white-space: nowrap; padding-top: 4px; }
+
+  .banner {
+    background: rgba(250, 204, 21, 0.1);
+    border: 1px solid rgba(250, 204, 21, 0.45);
+    color: #fde68a;
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 12.5px;
+    margin-bottom: 14px;
+    line-height: 1.6;
+    display: none;
+  }
+
+  .banner a { color: #fde68a; font-weight: 700; cursor: pointer; text-decoration: underline; }
+
+  .actions { margin-bottom: 16px; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 15px;
+    margin: 0 8px 8px 0;
+    border-radius: 9px;
+    border: 1px solid #223049;
+    background: #131c2e;
+    color: #e6edf7;
+    cursor: pointer;
+  }
+
+  button:hover { border-color: #38bdf8; }
+  button[disabled] { opacity: 0.45; cursor: default; border-color: #223049; }
+
+  button.primary { background: #38bdf8; color: #04202c; border-color: #38bdf8; }
+  button.danger { color: #f87171; border-color: rgba(239, 68, 68, 0.45); }
+
+  .summary { font-size: 12.5px; color: #8fa2c0; margin: 0 0 11px; }
+
+  .card {
+    background: #131c2e;
+    border: 1px solid #223049;
+    border-radius: 12px;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-align: center;
+    align-items: center;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+  }
+
+  .card .name { font-weight: 600; font-size: 14px; }
+  .card .reason { color: #8fa2c0; font-size: 12px; margin-top: 2px; }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 11px;
+    border-radius: 20px;
+    white-space: nowrap;
+    margin-left: 12px;
+  }
+
+  .badge.online { color: #22c55e; background: rgba(34, 197, 94, 0.13); }
+  .badge.offline { color: #f87171; background: rgba(248, 113, 113, 0.13); }
+
+  .ver { font-size: 11px; font-weight: 600; color: #38bdf8; margin-left: 6px; }
+  .footer { color: #8fa2c0; font-size: 11.5px; text-align: center; margin-top: 22px; padding-top: 12px; border-top: 1px solid #223049; }
+
+  .note { color: #8fa2c0; text-align: center; padding: 34px 0; font-size: 13px; }
+  .note.bad { color: #f87171; }
+
+  .msg {
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 12.5px;
+    margin-bottom: 14px;
+    line-height: 1.6;
+    display: none;
+  }
+
+  .msg.ok { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.45); color: #86efac; }
+  .msg.err { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.45); color: #fca5a5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Printer Status Dashboard <span class="ver">v1.1.0</span></h1>
+      <p class="subtitle">เช็คสถานะ printer ทุกเครื่องในระบบนี้</p>
+    </div>
+    <div class="stamp" id="stamp">กำลังโหลด...</div>
+  </div>
+
+  <div class="banner" id="adminBanner">
+    ยังไม่ได้สิทธิ์ Administrator ปุ่ม Restart Spooler และ Clear Queue จะใช้ไม่ได้ (ดูสถานะได้ตามปกติ)
+    <a id="elevateLink">ลองขอสิทธิ์อีกครั้ง</a>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="actions">
+    <button class="primary" id="btnRestart">แก้ปัญหาพิมพ์ไม่ออก</button>
+    <button class="danger" id="btnClear">ลบงานพิมพ์ที่ค้างทั้งหมด</button>
+    <button id="btnRefresh">รีเฟรชตอนนี้</button>
+    <button id="btnAuto">หยุดรีเฟรชอัตโนมัติ</button>
+  </div>
+
+  <p class="summary" id="summary"></p>
+  <div id="list"><div class="note">กำลังตรวจสอบ...</div></div>
+
+  <div class="footer">Version 1.1.0 &middot; ผู้พัฒนา: eatppv &middot; ติดต่อ 099-491-6445</div>
+</div>
+
+<script type="text/javascript">
+// ES5 only -- the HTA host runs the Trident engine, not a modern browser.
+
+var REFRESH_MS = 5000;
+
+var shell = new ActiveXObject("WScript.Shell");
+var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+var selfPath = urlToWindowsPath(location.href);
+var scriptDir = selfPath.substring(0, selfPath.lastIndexOf("\\"));
+var runnerPath = scriptDir + "\\Dashboard-Runner.ps1";
+var outPath = fso.GetSpecialFolder(2).Path + "\\_printer_dashboard_out.json";
+var logPath = scriptDir + "\\dashboard-error.log";
+
+var autoTimer = null;
+var busy = false;
+
+// Set when this instance was already started by an elevation attempt, so a
+// failed elevation can never bounce the app in a loop.
+// The command-line check is not reliable under mshta, so a time-stamped flag
+// file in %TEMP% is also used: auto-elevation is attempted at most once per 5 min.
+var elevateFlag = fso.GetSpecialFolder(2).Path + "\\_printer_dashboard_elevate.flag";
+var elevateTried = /elevated/i.test(String(printerDashboard.commandLine || "")) || elevateRecentlyTried();
+
+function elevateRecentlyTried() {
+  try {
+    if (!fso.FileExists(elevateFlag)) { return false; }
+    var age = (new Date().getTime() - new Date(fso.GetFile(elevateFlag).DateLastModified).getTime());
+    return age < 300000;
+  } catch (e) { return false; }
+}
+
+function markElevateTried() {
+  try {
+    var f = fso.OpenTextFile(elevateFlag, 2, true);
+    f.Write("1");
+    f.Close();
+  } catch (e) { }
+}
+
+var elList = document.getElementById("list");
+var elSummary = document.getElementById("summary");
+var elStamp = document.getElementById("stamp");
+var elMsg = document.getElementById("msg");
+var elBanner = document.getElementById("adminBanner");
+var btnRestart = document.getElementById("btnRestart");
+var btnClear = document.getElementById("btnClear");
+var btnRefresh = document.getElementById("btnRefresh");
+var btnAuto = document.getElementById("btnAuto");
+
+function urlToWindowsPath(href) {
+  var p = href.replace(/^file:\/{2,3}/i, "");
+  p = decodeURIComponent(p);
+  return p.replace(/\//g, "\\");
+}
+
+function logLine(text) {
+  try {
+    var stamp = new Date().toLocaleString();
+    var stream = fso.OpenTextFile(logPath, 8, true, -1);
+    stream.WriteLine(stamp + " - " + text);
+    stream.Close();
+  } catch (e) { }
+}
+
+// Older document modes have no native JSON object, so fall back to eval.
+// The input is always our own ConvertTo-Json output, never remote content.
+function parseJson(raw) {
+  if (typeof JSON !== "undefined" && JSON.parse) { return JSON.parse(raw); }
+  return eval("(" + raw + ")");
+}
+
+window.onerror = function (message, url, line) {
+  logLine("SCRIPT ERROR: " + message + " (line " + line + ")");
+  return true;
+};
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) { return ""; }
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// The library speaks English; show Thai in the UI, but never hide an
+// unrecognised reason -- fall back to the original text.
+function toThai(reason) {
+  if (!reason) { return ""; }
+  var m;
+  if (/^Ready\.$/.test(reason)) { return "พร้อมใช้งาน"; }
+  if ((m = reason.match(/^Ready \(IP (.+) reachable\)\.$/))) { return "พร้อมใช้งาน (ติดต่อ " + m[1] + " ได้)"; }
+  if (/^Set to Work Offline\.$/.test(reason)) { return "ถูกตั้งเป็น Work Offline"; }
+  if ((m = reason.match(/^Status is '(.+)'\.$/))) { return "สถานะผิดปกติ: " + m[1]; }
+  if ((m = reason.match(/^(\d+) job\(s\) stuck in an error state\.$/))) { return "มีงานพิมพ์ค้าง error อยู่ " + m[1] + " งาน"; }
+  if ((m = reason.match(/^Cannot reach IP (.+)\.$/))) { return "ติดต่อ IP " + m[1] + " ไม่ได้"; }
+  if (/^Device not connected \(unplugged\)\.$/.test(reason)) { return "ไม่ได้เสียบสาย/เชื่อมต่ออุปกรณ์"; }
+  if (/^Print Spooler service is not running\.$/.test(reason)) { return "บริการ Print Spooler ไม่ทำงาน"; }
+  if (/^Printer not found on this system\.$/.test(reason)) { return "ไม่พบ printer นี้ในระบบ"; }
+  if (/^No printers found on this system\.$/.test(reason)) { return "ไม่พบ printer ในระบบ"; }
+  return reason;
+}
+
+function showMessage(text, ok) {
+  elMsg.className = "msg " + (ok ? "ok" : "err");
+  elMsg.innerHTML = escapeHtml(text);
+  elMsg.style.display = "block";
+}
+
+function clearMessage() {
+  elMsg.style.display = "none";
+}
+
+// Runs the runner hidden and synchronously, then parses the JSON it wrote.
+function runAction(action) {
+  if (fso.FileExists(outPath)) {
+    try { fso.DeleteFile(outPath, true); } catch (eDel) { }
+  }
+
+  var cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' +
+            runnerPath + '" -Action ' + action + ' -OutFile "' + outPath + '"';
+
+  shell.Run(cmd, 0, true);
+
+  if (!fso.FileExists(outPath)) {
+    throw new Error("ไม่ได้รับผลลัพธ์จาก PowerShell (ตรวจสอบว่ามีไฟล์ Dashboard-Runner.ps1 และ PrinterLib.ps1 อยู่ในโฟลเดอร์เดียวกับไฟล์นี้)");
+  }
+
+  var stream = fso.OpenTextFile(outPath, 1, false, -1);
+  var raw = stream.ReadAll();
+  stream.Close();
+
+  if (!raw || raw === "") {
+    throw new Error("ผลลัพธ์จาก PowerShell ว่างเปล่า");
+  }
+  return parseJson(raw);
+}
+
+function renderPrinters(printers) {
+  if (!printers || printers.length === 0) {
+    elList.innerHTML = '<div class="note">ไม่พบ printer ในระบบ</div>';
+    elSummary.innerHTML = "";
+    return;
+  }
+
+  var onlineCount = 0;
+  var html = [];
+  for (var i = 0; i < printers.length; i++) {
+    var p = printers[i];
+    if (p.Ready) { onlineCount++; }
+
+    var detail = toThai(p.Reason);
+    if (p.IP) { detail += " &middot; " + escapeHtml(p.IP); }
+
+    html.push(
+      '<div class="card"><div>' +
+        '<div class="name">' + escapeHtml(p.Name) + '</div>' +
+        '<div class="reason">' + detail + '</div>' +
+      '</div><span class="badge ' + (p.Ready ? "online" : "offline") + '">' +
+        (p.Ready ? "ONLINE" : "OFFLINE") +
+      '</span></div>'
+    );
+  }
+
+  elSummary.innerHTML = "พร้อมใช้งาน " + onlineCount + " / " + printers.length + " เครื่อง";
+  elList.innerHTML = html.join("");
+}
+
+function timeNow() {
+  var d = new Date();
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+}
+
+function refreshStatus() {
+  if (busy) { return false; }
+  busy = true;
+  var isAdmin = true;
+  try {
+    var data = runAction("status");
+    renderPrinters(data.Printers);
+    isAdmin = !!data.IsAdmin;
+    elBanner.style.display = isAdmin ? "none" : "block";
+    elStamp.innerHTML = "อัปเดตล่าสุด " + timeNow();
+  } catch (e) {
+    logLine("refreshStatus failed: " + e.message);
+    elList.innerHTML = '<div class="note bad">' + escapeHtml(e.message) + "</div>";
+    elStamp.innerHTML = "ตรวจสอบไม่สำเร็จ";
+  }
+  busy = false;
+  return isAdmin;
+}
+
+// Relaunches this dashboard elevated. Windows always shows the UAC prompt for
+// this, so the user only has to click Yes -- no right-click needed.
+function relaunchElevated() {
+  try {
+    markElevateTried();
+    var app = new ActiveXObject("Shell.Application");
+    app.ShellExecute("mshta.exe", '"' + selfPath + '" /elevated', "", "runas", 1);
+    window.close();
+    return true;
+  } catch (e) {
+    logLine("elevation failed: " + e.message);
+    return false;
+  }
+}
+
+function doAction(action, btn, busyLabel, confirmText) {
+  if (confirmText && !confirm(confirmText)) { return; }
+  if (busy) { return; }
+
+  busy = true;
+  var original = btn.innerHTML;
+  btn.innerHTML = busyLabel;
+  btn.disabled = true;
+  clearMessage();
+
+  // Let the button repaint before the synchronous PowerShell call blocks the UI.
+  setTimeout(function () {
+    try {
+      var data = runAction(action);
+      showMessage(data.Message, !!data.Success);
+    } catch (e) {
+      showMessage(e.message, false);
+    }
+    btn.innerHTML = original;
+    btn.disabled = false;
+    busy = false;
+    refreshStatus();
+  }, 40);
+}
+
+function startAuto() {
+  if (autoTimer) { return; }
+  autoTimer = setInterval(refreshStatus, REFRESH_MS);
+  btnAuto.innerHTML = "หยุดรีเฟรชอัตโนมัติ";
+}
+
+function stopAuto() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  btnAuto.innerHTML = "เริ่มรีเฟรชอัตโนมัติ";
+}
+
+btnRestart.onclick = function () {
+  doAction("restart", btnRestart, "กำลังแก้ไข...", null);
+};
+
+btnClear.onclick = function () {
+  doAction(
+    "clear",
+    btnClear,
+    "กำลังล้างคิว...",
+    "จะลบงานพิมพ์ที่ค้างอยู่ทั้งหมดถาวร กู้คืนไม่ได้\n\nยืนยันหรือไม่?"
+  );
+};
+
+btnRefresh.onclick = function () { refreshStatus(); };
+
+btnAuto.onclick = function () {
+  if (autoTimer) { stopAuto(); } else { startAuto(); refreshStatus(); }
+};
+
+document.getElementById("elevateLink").onclick = function () {
+  if (!relaunchElevated()) {
+    showMessage("ยกระดับสิทธิ์ไม่สำเร็จ (ถูกยกเลิก หรือถูกนโยบายเครื่องบล็อก)", false);
+  }
+};
+
+window.onload = function () {
+  window.resizeTo(780, 840);
+
+  var isAdmin = refreshStatus();
+
+  // Ask for admin rights straight away so the control buttons just work.
+  // If the user declines UAC, stay open in read-only mode rather than quitting.
+  if (!isAdmin && !elevateTried) {
+    if (relaunchElevated()) { return; }
+  }
+
+  startAuto();
+};
+</script>
+</body>
+</html>

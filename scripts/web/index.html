@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Printer Status Dashboard</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #131c2e;
+    --panel-border: #223049;
+    --text: #e6edf7;
+    --muted: #8fa2c0;
+    --online: #22c55e;
+    --online-bg: rgba(34, 197, 94, 0.12);
+    --offline: #f87171;
+    --offline-bg: rgba(248, 113, 113, 0.12);
+    --accent: #38bdf8;
+    --accent-ink: #04202c;
+    --danger: #ef4444;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif;
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+    margin: 0 0 4px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .refresh-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    white-space: nowrap;
+    padding-top: 4px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite ease-in-out;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    transition: transform 0.08s ease, border-color 0.15s ease;
+  }
+
+  button:hover { border-color: var(--accent); }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  button.primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+
+  button.danger {
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.4);
+  }
+
+  button.danger:hover { border-color: var(--danger); }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .card .name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .card .reason {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 2px;
+  }
+
+  .badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .badge.online { color: var(--online); background: var(--online-bg); }
+  .badge.offline { color: var(--offline); background: var(--offline-bg); }
+
+  .empty, .loading {
+    color: var(--muted);
+    text-align: center;
+    padding: 40px 0;
+    font-size: 0.9rem;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    max-width: 90vw;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast.ok { border-color: rgba(34, 197, 94, 0.5); }
+  .toast.err { border-color: rgba(239, 68, 68, 0.5); }
+
+  .summary {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Printer Status Dashboard</h1>
+        <p class="subtitle" id="hostnote">เช็คสถานะ printer ทุกเครื่องในระบบ</p>
+      </div>
+      <div class="refresh-pill"><span class="dot"></span><span id="lastUpdated">กำลังโหลด...</span></div>
+    </header>
+
+    <div class="actions">
+      <button class="primary" id="btnRestart">Restart Print Spooler</button>
+      <button class="danger" id="btnClear">Clear Print Queue</button>
+      <button id="btnRefreshNow">รีเฟรชตอนนี้</button>
+    </div>
+
+    <p class="summary" id="summary"></p>
+    <div id="list"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const listEl = document.getElementById('list');
+const summaryEl = document.getElementById('summary');
+const lastUpdatedEl = document.getElementById('lastUpdated');
+const toastEl = document.getElementById('toast');
+const btnRestart = document.getElementById('btnRestart');
+const btnClear = document.getElementById('btnClear');
+const btnRefreshNow = document.getElementById('btnRefreshNow');
+
+let toastTimer = null;
+function showToast(message, ok) {
+  toastEl.textContent = message;
+  toastEl.className = 'toast show ' + (ok ? 'ok' : 'err');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.className = 'toast'; }, 4000);
+}
+
+function renderPrinters(items) {
+  if (!items || items.length === 0) {
+    listEl.innerHTML = '<div class="empty">ไม่พบ printer ในระบบ</div>';
+    summaryEl.textContent = '';
+    return;
+  }
+
+  const onlineCount = items.filter(p => p.Ready).length;
+  summaryEl.textContent = `พร้อมใช้งาน ${onlineCount} / ${items.length} เครื่อง`;
+
+  listEl.innerHTML = items.map(p => `
+    <div class="card">
+      <div>
+        <div class="name">${escapeHtml(p.Name)}</div>
+        <div class="reason">${escapeHtml(p.Reason)}${p.IP ? ' &middot; ' + escapeHtml(p.IP) : ''}</div>
+      </div>
+      <span class="badge ${p.Ready ? 'online' : 'offline'}">${p.Ready ? 'ONLINE' : 'OFFLINE'}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+async function refreshStatus() {
+  try {
+    const res = await fetch('/api/status', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : [data];
+    renderPrinters(items);
+    lastUpdatedEl.textContent = 'อัปเดตล่าสุด ' + new Date().toLocaleTimeString('th-TH');
+  } catch (err) {
+    lastUpdatedEl.textContent = 'เชื่อมต่อ server ไม่ได้';
+    listEl.innerHTML = `<div class="empty">โหลดสถานะไม่ได้: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function callAction(url, confirmMessage, busyLabel, btn) {
+  if (confirmMessage && !confirm(confirmMessage)) return;
+
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+
+  try {
+    const res = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+    showToast(data.Message || (data.Success ? 'สำเร็จ' : 'ล้มเหลว'), !!data.Success);
+  } catch (err) {
+    showToast('เรียกใช้งานไม่สำเร็จ: ' + err.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    refreshStatus();
+  }
+}
+
+btnRestart.addEventListener('click', () => {
+  callAction('/api/restart-spooler', null, 'กำลัง restart...', btnRestart);
+});
+
+btnClear.addEventListener('click', () => {
+  callAction(
+    '/api/clear-queue',
+    'จะลบงานพิมพ์ที่ค้างอยู่ทั้งหมดถาวร กู้คืนไม่ได้ ยืนยันหรือไม่?',
+    'กำลังล้างคิว...',
+    btnClear
+  );
+});
+
+btnRefreshNow.addEventListener('click', refreshStatus);
+
+refreshStatus();
+setInterval(refreshStatus, 5000);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

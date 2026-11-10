@@ -1,0 +1,5 @@
+# Runtime logs (contain local printer names / IPs)
+*.log
+
+# Local Claude Code settings
+.claude/
